@@ -492,6 +492,8 @@ build_dynamic_response(App, Request, Response, Url) ->
     end,
     Response2 = lists:foldl(fun({K, V}, Acc) -> Acc:header(K, V) end, Response1, Headers2),
     case Payload of
+        {file, Path} ->
+            (Response2:file(Path)):build_response();
         {stream, Generator, Acc0} ->
             Response3 = Response2:data(chunked),
             Response3:build_response(),
@@ -622,6 +624,8 @@ process_result(AppInfo, Req, {Status, Payload}) ->
     process_result(AppInfo, Req, {Status, Payload, []});
 process_result(_, _, {ok, Payload, Headers}) ->
     {200, merge_headers(Headers, [{"Content-Type", "text/html"}]), Payload};
+process_result(AppInfo, Req, {file, Path, Headers}) ->
+    {200, Headers, {file, Path}};
 process_result(AppInfo, Req, {stream, Generator, Acc0}) ->
     process_result(AppInfo, Req, {stream, Generator, Acc0, []});
 process_result(_, _, {stream, Generator, Acc0, Headers}) ->
@@ -966,6 +970,11 @@ process_action_result(Info, {output, Payload}, ExtraHeaders, AppInfo, AuthInfo) 
     process_action_result(Info, {output, Payload, []}, ExtraHeaders, AppInfo, AuthInfo);
 process_action_result(_, {output, Payload, Headers}, ExtraHeaders, _, _) ->
     {ok, Payload, merge_headers(Headers, ExtraHeaders)};
+
+process_action_result(Info, {file, Path}, ExtraHeaders, AppInfo, AuthInfo) ->
+    process_action_result(Info, {file, Path, []}, ExtraHeaders, AppInfo, AuthInfo);
+process_action_result(_Info, {file, Path, Headers}, ExtraHeaders, _AppInfo, _AuthInfo) ->
+    {file, Path, merge_headers(Headers, ExtraHeaders)};
 
 process_action_result(_, Else, _, _, _) ->
     Else.
